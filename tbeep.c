@@ -5,13 +5,21 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <sys/wait.h>
 
 #include "tbeep.h"
 
 volatile sig_atomic_t running = 1;
+volatile sig_atomic_t interrupted = 0;
+static pid_t aplay_pid = 0;
 
 void handle_sigint(int sig) {
+    interrupted = 1;
     running = 0;
+
+    if (aplay_pid > 0) {
+        kill(aplay_pid, SIGTERM);
+    }
 }
 
 void write_temp_wav(const char *filename) {
@@ -62,6 +70,19 @@ void print_time_left(int seconds_left) {
     fflush(stdout);
 }
 
+void play_beep(const char *tmp_wav) {
+    aplay_pid = fork();
+    if (aplay_pid == 0) {
+        freopen("/dev/null", "w", stderr);
+        execlp("aplay", "aplay", "-q", tmp_wav, NULL);
+        exit(EXIT_FAILURE);
+    } else if (aplay_pid > 0) {
+        int status;
+        waitpid(aplay_pid, &status, 0);
+        aplay_pid = 0;
+    }
+}
+
 int main(int argc, char *argv[]) {
     bool verbose = false;
     const char *duration_arg = NULL;
@@ -75,7 +96,7 @@ int main(int argc, char *argv[]) {
             printf("\nOptions:\n");
             printf("  -v       Show countdown timer\n");
             printf("  -h       Show this help message\n");
-            printf("\nPress Ctrl+C to stop the beep when time's up.\n");
+            printf("\nPress Ctrl+C to stop the timer or beep.\n");
             return EXIT_SUCCESS;
         } else {
             duration_arg = argv[1];
@@ -93,6 +114,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Please enter a positive duration.\n");
         return EXIT_FAILURE;
     }
+
+    signal(SIGINT, handle_sigint);
 
     char tmp_wav[] = "/tmp/beepXXXXXX.wav";
     int fd = mkstemps(tmp_wav, 4);
@@ -112,18 +135,24 @@ int main(int argc, char *argv[]) {
         }
         printf("\r%*s\r", 30, "");
     } else {
-        sleep(seconds);
+        for (int i = 0; i < seconds && running; ++i) {
+            sleep(1);
+        }
     }
 
-    signal(SIGINT, handle_sigint);
+    if (interrupted) {
+        unlink(tmp_wav);
+        printf("\nTimer cancelled.\n");
+        return EXIT_SUCCESS;
+    }
+
     printf("Time's up! Beeping... (Ctrl+C to stop)\n");
 
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "aplay -q \"%s\"", tmp_wav);
-
     while (running) {
-        system(cmd);
-        usleep(500000);
+        play_beep(tmp_wav);
+        if (running) {
+            usleep(500000);
+        }
     }
 
     unlink(tmp_wav);
