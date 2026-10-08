@@ -1,2 +1,8 @@
-tbeep: tbeep.c tbeep.h
-	cc tbeep.c -o tbeep
+.PHONY: all build test clean
+all: build
+build:
+	cargo build --release
+test:
+	cargo test --locked
+clean:
+	cargo clean

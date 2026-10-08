@@ -1,0 +1,16 @@
+[package]
+name = "tbeep"
+version = "0.2.0"
+edition = "2024"
+description = "A cross-platform terminal timer with a built-in alarm"
+license = "MIT"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+ctrlc = "3.5"
+ratatui = "0.30"
+rodio = { version = "0.22", default-features = false, features = ["playback", "wav"] }
+
+[profile.release]
+lto = "thin"
+strip = true

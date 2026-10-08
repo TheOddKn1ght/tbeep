@@ -1,57 +1,81 @@
 # tbeep
 
-`tbeep` is a simple command-line timer utility written in C. When the timer expires, it repeatedly plays a beep sound (WAV file) until interrupted by the user.
+A Rust timer with a terminal dashboard and a
+built-in alarm for **macOS, Linux, and Windows**.
 
-## Features
-- Set a timer for a specified duration (supports hours, minutes, seconds)
-- Plays a beep sound when the timer ends
-- Continues beeping until you stop it with `Ctrl+C`
-- Optional countdown timer display
+## Build and install
 
-## Requirements
-- `GCC` or another `C` compiler
-- `aplay` utility (usually provided by ALSA on Linux)
-- Standard C library
-- **Unix-like environment only** (uses `/tmp`, `unistd.h`, and `aplay`)
-
-## Building
-
-To build `tbeep`, simply run:
+Install the current stable [Rust toolchain](https://rustup.rs/), then:
 
 ```sh
-make
+cargo build --locked --release
+cargo install --path . --locked
 ```
 
-## Usage
+The built executable is `target/release/tbeep` (`tbeep.exe` on Windows).
+`make` also builds the release executable where Make is available.
+
+On Linux, install ALSA development files and pkg-config first:
 
 ```sh
-./tbeep [-v] <duration>
+# Debian / Ubuntu
+sudo apt-get install libasound2-dev pkg-config
+# Fedora
+sudo dnf install alsa-lib-devel pkgconf-pkg-config
 ```
 
-- `-v`: Show countdown timer (optional)
-- `<duration>`: Time to wait before beeping. You can use:
-  - Just seconds (e.g., `10`)
-  - Or a combination: `[Nh][Nm][Ns]` (e.g., `1h30m10s`, `5m`, `90s`)
+No external audio player or temporary WAV file is needed. The original alarm is
+embedded in the executable and plays through the default audio device.
 
-### Examples
+## Use
 
-Set a timer for 10 seconds:
 ```sh
-./tbeep 10
+tbeep                 # Enter a duration or choose a 5-, 15-, or 25-minute preset
+tbeep 10              # Start a ten-second timer in the dashboard
+tbeep 1h30m10s         # Hours, minutes, seconds
+tbeep --plain 5m      # Plain output; alarm repeats until Ctrl+C
+tbeep -v 90s          # Plain output with countdown
+tbeep --help
+tbeep --version
 ```
 
-Set a timer for 1 hour, 5 minutes, and 10 seconds, with countdown:
+Durations are positive whole seconds or ordered `h`, `m`, `s` components. Each
+component needs a number; repeated units, fractional values, trailing bare
+numbers in mixed input, and overflowing values are rejected.
+
+The dashboard uses large countdown digits, a progress bar, cyan accents, and
+layouts that adjust to terminal size. In the entry screen, use Left/Right or Tab
+to select a preset, type a duration to override it, and press Enter to start.
+
+| Key | Action |
+| --- | --- |
+| Space | Pause / resume |
+| `r` | Restart the original duration |
+| `m` | Toggle sound (in entry, available before typing) |
+| Enter after expiry | Stop the alarm and return to duration entry |
+| `q`, Esc, Ctrl+C | Stop and exit |
+
+The alarm repeats with a 500 ms gap until dismissed. Muting immediately stops
+playback; unmuting an expired timer starts it again. If audio cannot initialize,
+a visible warning appears and a terminal bell repeats instead. Terminal settings
+may silence the bell. The terminal is restored on exit, errors, and panics.
+
+Plain mode is selected automatically if stdin or stdout is not a terminal; it
+requires a duration. `-v` also selects plain mode, retaining the original countdown
+option. Redirected countdown output uses lines rather than cursor control codes.
+
+## Development
+
 ```sh
-./tbeep -v 1h5m10s
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --locked --release
 ```
 
-Show help:
-```sh
-./tbeep -h
-```
+Tests cover parsing, timer transitions, alarm scheduling and cancellation, the
+embedded WAV, keyboard controls, and rendering at different terminal sizes.
+CI runs checks, tests, and release builds natively on macOS, Ubuntu, and Windows.
+Audio hardware and terminal interaction still need manual checks on each platform.
 
-## How it works
-- The program creates a temporary WAV file containing a beep sound in `/tmp`.
-- It waits for the specified duration.
-- When the timer expires, it repeatedly plays the beep sound using `aplay` until interrupted.
-- The temporary WAV file is deleted when the program exits.
+MIT licensed; see [LICENSE](LICENSE).
