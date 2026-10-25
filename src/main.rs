@@ -23,7 +23,11 @@ use timer::{Status, Timer};
 struct Args {
     #[arg(help = "Seconds or a duration such as 5m or 1h30m10s")]
     duration: Option<String>,
-    #[arg(long, help = "Use plain output instead of the terminal dashboard")]
+    #[arg(
+        short = 'p',
+        long,
+        help = "Use plain output instead of the terminal dashboard"
+    )]
     plain: bool,
     #[arg(short = 'v', long, help = "Use plain output and show the countdown")]
     verbose: bool,
